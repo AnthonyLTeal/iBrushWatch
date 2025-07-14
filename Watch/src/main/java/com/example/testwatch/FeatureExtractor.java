@@ -129,9 +129,6 @@ public class FeatureExtractor {
             }
 
             Log.d("INFO", String.format("Features: %s %s %s %s %s %s %s %s %s %s", mean, variance, mad, rms, zcr, iqr, percentile75, kurtosis, sma, mm));
-
-//            System.out.printf("Mean: %.3f\nVar: %.3f\nRMS: %.3f\nMAD: %.3f\nMinMax: %.3f\n", mean, variance, rms, mad, mm);
-//            System.out.printf("IQR: %.3f\nP75: %.3f\nKurtosis: %.3f\n", iqr, percentile75, kurtosis);
         }
 
         return new double[0];
