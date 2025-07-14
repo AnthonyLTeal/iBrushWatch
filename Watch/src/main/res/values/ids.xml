@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="currentX" type="id" />
+    <item name="currentY" type="id" />
+    <item name="currentZ" type="id" />
+</resources>
