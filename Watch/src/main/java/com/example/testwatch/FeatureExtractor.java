@@ -134,11 +134,6 @@ public class FeatureExtractor {
 //            System.out.printf("IQR: %.3f\nP75: %.3f\nKurtosis: %.3f\n", iqr, percentile75, kurtosis);
         }
 
-        double[] channelData = {1.0, -2.0, 3.0, -4.0, 5.0, -6.0};
-        double mean = StatUtils.mean(channelData);
-        double zcr = zeroCrossingRate(channelData, mean);
-        Log.d("INFO", "Zero Crossing Rate: " + zcr);
-
         return new double[0];
     }
 }
