@@ -34,4 +34,5 @@ dependencies {
     implementation 'androidx.wear:wear:1.1.0'
     implementation 'org.tensorflow:tensorflow-lite:+'
     implementation 'org.apache.commons:commons-math3:3.6.1'
+    implementation 'com.github.wendykierp:JTransforms:3.1'
 }

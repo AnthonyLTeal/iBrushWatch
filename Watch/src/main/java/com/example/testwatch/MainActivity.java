@@ -65,8 +65,11 @@ public class MainActivity extends Activity implements SensorEventListener {
     private int seconds = 0;
     private boolean running;
     private boolean wasRunning;
-
     private Interpreter tflite;
+
+    private static final int FEATURECOUNT = 103;
+    private static final int DATAPOINTS = 6;
+    private static final int TECHNIQUECOUNT = 7;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -197,7 +200,7 @@ public class MainActivity extends Activity implements SensorEventListener {
             return null;
         //do inference
         float[][] inputVal= testData; // inputVal should be set to the data of one of the users xml files loaded as an appropriate array
-        float[][] output=new float[testData.length][7]; //I think this should be correct for the number of classifiers
+        float[][] output=new float[testData.length][TECHNIQUECOUNT];
         tflite.run(inputVal,output);
         return output;
     }
@@ -222,7 +225,7 @@ public class MainActivity extends Activity implements SensorEventListener {
             ioe.printStackTrace();
         }
 
-        float[][] testData = new float[lines.size()][103];
+        float[][] testData = new float[lines.size()][DATAPOINTS];
 
         for (int i = 0; i < lines.size(); i++)
         {
@@ -231,14 +234,6 @@ public class MainActivity extends Activity implements SensorEventListener {
             for (int j = 0; j < cells.length; j++){
                 testData[i][j] = Float.parseFloat(cells[j]);
             }
-
-//            testData[i][0] = Float.parseFloat(cells[0]);
-//            testData[i][1] = Float.parseFloat(cells[1]);
-//            testData[i][2] = Float.parseFloat(cells[2]);
-//            testData[i][3] = Float.parseFloat(cells[3]);
-//            testData[i][4] = Float.parseFloat(cells[4]);
-//            testData[i][5] = Float.parseFloat(cells[5]);
-//            Log.d("INFO", String.valueOf(i));
         }
 
         return testData;
@@ -263,87 +258,98 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
     }
 
+    public float[][] prepareData(float[][] rawData) throws Exception {
+        Vector3D[] accelerometerData = new Vector3D[rawData.length];
+        Vector3D[] gyroData = new Vector3D[rawData.length];
+        for (int i = 0; i < rawData.length; i++) {
+            accelerometerData[i] = new Vector3D(rawData[i][0], rawData[i][1], rawData[i][2]);
+            gyroData[i] = new Vector3D(rawData[i][3], rawData[i][4], rawData[i][5]);
+        }
+
+        GravityData gravityData = DataProcessor.GravityFilter(accelerometerData);
+        Vector2D[] angles = DataProcessor.GetPartialEulerAngles(gravityData.getGravityData());
+        Vector3D[] complement = DataProcessor.ComplementaryFilter(gyroData, angles);
+
+        //need to remove 0th element from linearAcceleration since we removed it from the gravity angles in the complementaryFilter
+        Vector3D[] linearAcceleration = new Vector3D[gravityData.getLinearAcceleration().length - 1];
+        for (int i = 0; i < linearAcceleration.length; i++){
+            linearAcceleration[i] = gravityData.getLinearAcceleration()[i + 1];
+        }
+
+        double[][][] windows = DataProcessor.CreateSlidingWindow(complement, linearAcceleration, 100, .5f );
+
+        float[][] scaled = new float[windows.length][FEATURECOUNT];
+        for (int i = 0; i < windows.length; i++){
+            double[] features = FeatureExtractor.Features(windows[i]);
+            scaled[i] = Scaler.Fitf(features);
+            //Log.d("INFO", Arrays.toString(scaled[i]));
+        }
+        return scaled;
+    }
+
     public void onClickPredict(View view)
     {
         try {
-            float[][] testData = loadTestData("BassBrandon.csv");
-
-            long initialTime = System.currentTimeMillis();
-            Vector3D[] accelerometerData = new Vector3D[testData.length];
-            Vector3D[] gyroData = new Vector3D[testData.length];
-            for (int i = 0; i < testData.length; i++) {
-                accelerometerData[i] = new Vector3D(testData[i][0], testData[i][1], testData[i][2]);
-                gyroData[i] = new Vector3D(testData[i][3], testData[i][4], testData[i][5]);
-            }
-
-            GravityData gravityData = DataProcessor.GravityFilter(accelerometerData);
-            Vector2D[] angles = DataProcessor.GetPartialEulerAngles(gravityData.getGravityData());
-            Vector3D[] complement = DataProcessor.ComplementaryFilter(gyroData, angles);
-
-            //need to remove 0th element from linearAcceleration since we removed it from the gravity angles in the complementaryFilter
-            Vector3D[] linearAcceleration = new Vector3D[gravityData.getLinearAcceleration().length - 1];
-            for (int i = 0; i < linearAcceleration.length; i++){
-                linearAcceleration[i] = gravityData.getLinearAcceleration()[i + 1];
-            }
-
-            double[][][] windows = DataProcessor.CreateSlidingWindow(complement, linearAcceleration, 100, .5f );
-
-            FeatureExtractor.Corr(windows[0]);
-            FeatureExtractor.Features(windows[0]);
-
-            long endTime = System.currentTimeMillis();
-            float totalTimeMilli = endTime - initialTime;
-
-            Log.d("INFO", "Milliseconds to Preprocess: " + totalTimeMilli);
-
+//            float[][] testData = loadTestData("BassBrandon.csv");
+//
+//            long initialTime = System.currentTimeMillis();
+//
+//            Log.d("INFO", Arrays.toString(scaled));
+//
+//            long endTime = System.currentTimeMillis();
+//            float totalTimeMilli = endTime - initialTime;
+//            Log.d("INFO", "Milliseconds to Preprocess: " + totalTimeMilli);
+//            Log.d("INFO", "");
+//
 //            for (int i = 0; i < complement.length; i++){
 //                Log.d("INFO", "i: " + i + " - " + complement[i]);
 //            }
 
-//            String[] fileList = this.getAssets().list("");
-//            for (String file : fileList)
-//            {
-//                Log.d("INFO", "Filename: " + file);
-//
-//                if (!file.contains(".csv")){
-//                    continue;
-//                }
-//                long initialTime = System.currentTimeMillis();
-//
-//                float[][] testData = loadTestData(file);
-//                loadModel();
-//                float[][] result = doInference(testData);
-//
-//                long endTime = System.currentTimeMillis();
-//                float totalTimeMilli = endTime - initialTime;
-//
-//                float[] finalResults = new float[7];
-//
-//                for (int i = 0; i < result.length; i++){
-//                    String line = "";
-//                    for (int j = 0; j < result[i].length; j++){
-//                        line = line + " " + result[i][j];
-//                        finalResults[j] += result[i][j];
-//                    }
-//                    Log.d("INFO", line);
-//                }
-//
-//                float largestPrediction = 0;
-//                int predictedValue = -1;
-//
-//                for (int i = 0; i < finalResults.length; i++){
-//                    finalResults[i] /= testData.length;
-//                    if (finalResults[i] > largestPrediction){
-//                        largestPrediction = finalResults[i];
-//                        predictedValue = i;
-//                    }
-//                    Log.d("INFO", "[" + i + "]" + " Final Result: " + finalResults[i]);
-//                }
-//
-//                //Log.d("INFO", "Predictions: " + finalResults);
-//                Log.d("INFO", "Predicted Value: " + predictedValue);
-//                Log.d("INFO", "onClickPredict time to run: " + totalTimeMilli);
-//            }
+            String[] fileList = this.getAssets().list("");
+            for (String file : fileList)
+            {
+                Log.d("INFO", "Filename: " + file);
+
+                if (!file.contains(".csv")){
+                    continue;
+                }
+                long initialTime = System.currentTimeMillis();
+
+                float[][] testData = loadTestData(file);
+                float[][] preparedData = prepareData(testData);
+                loadModel();
+                float[][] result = doInference(preparedData);
+
+                long endTime = System.currentTimeMillis();
+                float totalTimeMilli = endTime - initialTime;
+
+                float[] finalResults = new float[TECHNIQUECOUNT];
+
+                for (int i = 0; i < result.length; i++){
+                    String line = "";
+                    for (int j = 0; j < result[i].length; j++){
+                        line = line + " " + result[i][j];
+                        finalResults[j] += result[i][j];
+                    }
+                    Log.d("INFO", line);
+                }
+
+                float largestPrediction = 0;
+                int predictedValue = -1;
+
+                for (int i = 0; i < finalResults.length; i++){
+                    finalResults[i] /= preparedData.length;
+                    if (finalResults[i] > largestPrediction){
+                        largestPrediction = finalResults[i];
+                        predictedValue = i;
+                    }
+                    Log.d("INFO", "[" + i + "]" + " Final Result: " + finalResults[i]);
+                }
+
+                //Log.d("INFO", "Predictions: " + finalResults);
+                Log.d("INFO", "Predicted Value: " + predictedValue);
+                Log.d("INFO", "onClickPredict time to run: " + totalTimeMilli);
+            }
 
         }catch (Exception e){
             e.printStackTrace();

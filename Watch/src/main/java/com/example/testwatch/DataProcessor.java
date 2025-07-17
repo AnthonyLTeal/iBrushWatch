@@ -101,14 +101,6 @@ public class DataProcessor {
         return windowedData;
     }
 
-    public static double tiltAngle(double x, double y, double z) {
-        return Math.toDegrees(Math.atan2(Math.sqrt(y * y + z * z), x));
-    }
-
-    public static float[][] Segmentation(float[] data, int segmentLength){
-        return new float[0][0];
-    }
-
     public static float[] StandardScaler(float[] data) {
         return new float[0];
     }
