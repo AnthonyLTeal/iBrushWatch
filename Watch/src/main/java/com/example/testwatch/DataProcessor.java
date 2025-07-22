@@ -74,8 +74,8 @@ public class DataProcessor {
     public static double[][][] CreateSlidingWindow(Vector3D[] filteredAngles, Vector3D[] linearAcceleration, int windowSize, float slidingOffsetPercent){
         int windowCount = filteredAngles.length / windowSize;
         windowCount = (int)(((windowCount-1)/slidingOffsetPercent) + 1);
-        Log.d("INFO", "slidingOffsetPercent: " + slidingOffsetPercent);
-        Log.d("INFO", "WindowCount: " + windowCount);
+        //Log.d("INFO", "slidingOffsetPercent: " + slidingOffsetPercent);
+        //Log.d("INFO", "WindowCount: " + windowCount);
         double[][][] windowedData = new double[windowCount][windowSize][6];
         for (int i = 0; i < windowCount; i++){
             //Log.d("Info", "i: " + i);

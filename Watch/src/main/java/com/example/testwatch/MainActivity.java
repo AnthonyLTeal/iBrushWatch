@@ -10,7 +10,6 @@ import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
@@ -23,14 +22,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.nio.FloatBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Vector;
+import java.util.Map;
 
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.apache.commons.math3.geometry.euclidean.twod.Vector2D;
@@ -70,6 +71,9 @@ public class MainActivity extends Activity implements SensorEventListener {
     private static final int FEATURECOUNT = 103;
     private static final int DATAPOINTS = 6;
     private static final int TECHNIQUECOUNT = 7;
+    private static final int EPOCHS = 50;
+
+    private static final String[] TECHNIQUES = new String[]{"Bass", "Charter", "Fones", "Horizontal", "Rolling", "Stillman", "Vertical"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -194,15 +198,44 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
     }
 
-    private float[][] doInference(float[][] testData)
+    private float[] doTraining(float[][] processedData, int classifier){
+        float[] losses = new float[EPOCHS];
+        for (int epoch = 0; epoch < EPOCHS; epoch++){
+            if (tflite == null)
+                return null;
+            Map<String, Object> inputs = new HashMap<>();
+            inputs.put("x", processedData);
+            int[] classifiers = new int[processedData.length];
+            for (int i = 0; i < processedData.length; i++){
+                classifiers[i] = classifier;
+            }
+            inputs.put("y", classifiers);
+
+            Map<String, Object> outputs = new HashMap<>();
+            FloatBuffer loss = FloatBuffer.allocate(1);
+            outputs.put("loss", loss);
+
+            tflite.runSignature(inputs, outputs, "train");
+            //losses[epoch] = loss.get(0);
+            //Log.d("INFO", "Losses: " + loss.get(0));
+        }
+
+        //Log.d("INFO", "Losses: " + Arrays.toString(losses));
+
+        return losses;
+    }
+
+    private float[][] doInference(float[][] processedData)
     {
         if (tflite == null)
             return null;
         //do inference
-        float[][] inputVal= testData; // inputVal should be set to the data of one of the users xml files loaded as an appropriate array
-        float[][] output=new float[testData.length][TECHNIQUECOUNT];
+        float[][] inputVal= processedData; // inputVal should be set to the data of one of the users xml files loaded as an appropriate array
+        float[][] output=new float[processedData.length][TECHNIQUECOUNT];
         tflite.run(inputVal,output);
         return output;
+        //tflite.runSignature(inputVal, output, "");
+        //return new float[0][0];
     }
 
     private float[][] loadTestData(String filename)
@@ -287,28 +320,49 @@ public class MainActivity extends Activity implements SensorEventListener {
         return scaled;
     }
 
+    public void onClickTrainTest() {
+        ArrayList<float[]> trainingData = new ArrayList<>();
+        String[] testList = new String[]{"HorizontalAnthony1_processed.csv"};
+        //loadModel();
+
+        try {
+            for (int i = 0; i < testList.length; i++){
+                String file = testList[i];
+                //Log.d("INFO", "File Loaded: " + file);
+                float[][] testData = loadTestData(file);
+                float[][] preparedData = prepareData(testData);
+                trainingData.addAll(Arrays.asList(preparedData));
+            }
+            float[][] trainArr = new float[trainingData.size()][FEATURECOUNT];
+            trainArr = trainingData.toArray(trainArr);
+            doTraining(trainArr, 3);
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public int GetTechniqueFromFileName(String filename){
+        for (int i = 0; i < TECHNIQUES.length; i++){
+            String technique = TECHNIQUES[i].toUpperCase();
+            if (filename.toUpperCase().contains(technique)){
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public void onClickPredict(View view)
     {
         try {
-//            float[][] testData = loadTestData("BassBrandon.csv");
-//
-//            long initialTime = System.currentTimeMillis();
-//
-//            Log.d("INFO", Arrays.toString(scaled));
-//
-//            long endTime = System.currentTimeMillis();
-//            float totalTimeMilli = endTime - initialTime;
-//            Log.d("INFO", "Milliseconds to Preprocess: " + totalTimeMilli);
-//            Log.d("INFO", "");
-//
-//            for (int i = 0; i < complement.length; i++){
-//                Log.d("INFO", "i: " + i + " - " + complement[i]);
-//            }
-
+            loadModel();
+            onClickTrainTest();
             String[] fileList = this.getAssets().list("");
+            int[][] confusionMatrix = new int[TECHNIQUECOUNT][TECHNIQUECOUNT];
             for (String file : fileList)
             {
-                Log.d("INFO", "Filename: " + file);
+                //Log.d("INFO", "Filename: " + file);
+                int techniqueIndex = GetTechniqueFromFileName(file);
 
                 if (!file.contains(".csv")){
                     continue;
@@ -317,9 +371,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
                 float[][] testData = loadTestData(file);
                 float[][] preparedData = prepareData(testData);
-                loadModel();
                 float[][] result = doInference(preparedData);
-
                 long endTime = System.currentTimeMillis();
                 float totalTimeMilli = endTime - initialTime;
 
@@ -327,15 +379,27 @@ public class MainActivity extends Activity implements SensorEventListener {
 
                 for (int i = 0; i < result.length; i++){
                     String line = "";
+                    int predictedIndex = 0;
                     for (int j = 0; j < result[i].length; j++){
                         line = line + " " + result[i][j];
                         finalResults[j] += result[i][j];
+                        //Log.d("INFO", "Current: " + result[i][predictedIndex]);
+                        //Log.d("INFO", "Test: " + result[i][j]);
+                        if (result[i][j] > result[i][predictedIndex]){
+                            predictedIndex = j;
+                        }
                     }
+                    confusionMatrix[techniqueIndex][predictedIndex] += 1;
+                    //Log.d("INFO", Arrays.toString(result[i]) + " " + predictedIndex);
+
+                    line += " " + GetTechniqueFromFileName(file);
                     Log.d("INFO", line);
                 }
 
                 float largestPrediction = 0;
                 int predictedValue = -1;
+
+                String finalResultsLine = "";
 
                 for (int i = 0; i < finalResults.length; i++){
                     finalResults[i] /= preparedData.length;
@@ -343,13 +407,24 @@ public class MainActivity extends Activity implements SensorEventListener {
                         largestPrediction = finalResults[i];
                         predictedValue = i;
                     }
-                    Log.d("INFO", "[" + i + "]" + " Final Result: " + finalResults[i]);
+                    finalResultsLine += finalResults[i] + " ";
                 }
 
-                //Log.d("INFO", "Predictions: " + finalResults);
-                Log.d("INFO", "Predicted Value: " + predictedValue);
-                Log.d("INFO", "onClickPredict time to run: " + totalTimeMilli);
+                //Log.d("INFO", "Final-Result: " + finalResultsLine);
+                //Log.d("INFO", "Predicted-Value: " + predictedValue);
+
+                //Log.d("INFO", "onClickPredict time to run: " + totalTimeMilli);
             }
+
+            Log.d("INFO", "CONFUSION MATRIX");
+            for (int i = 0; i < confusionMatrix.length; i++){
+                String line = "";
+                for (int j = 0; j < confusionMatrix[i].length; j++){
+                    line += confusionMatrix[i][j] + " ";
+                }
+                Log.d("INFO", line);
+            }
+
 
         }catch (Exception e){
             e.printStackTrace();
