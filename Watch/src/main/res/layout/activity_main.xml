@@ -76,12 +76,14 @@
             android:layout_height="match_parent"
             android:layout_gravity="center"
             android:onClick="onClickPredict"
-            android:text="Predict" />
+            android:text="Predict"
+            android:visibility="gone" />
 
         <ToggleButton
             android:id="@+id/imageButton"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:layout_gravity="center"
             android:background="@android:drawable/btn_radio"
             android:checked="false"
             android:clickable="true"
@@ -93,7 +95,15 @@
             android:text="@string/start"
             android:textOff=" "
             android:textOn=" "
-            android:layout_gravity="center"/>
+            android:visibility="visible" />
+
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="252dp"
+            android:layout_height="40dp"
+            android:text="Test"
+            android:textAlignment="center"
+            android:visibility="invisible" />
 
     </LinearLayout>
 
